@@ -1,29 +1,85 @@
 'use strict';
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+import {window, commands, Disposable, ExtensionContext, StatusBarAlignment, 
+    StatusBarItem} from 'vscode';
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+export function activate(context: ExtensionContext) {
 
-    // Use the console to output diagnostic information (console.log) and errors (console.error)
-    // This line of code will only be executed once when your extension is activated
     console.log('Congratulations, your extension "coding-apm-tracker" is now active!');
 
-    // The command has been defined in the package.json file
-    // Now provide the implementation of the command with  registerCommand
-    // The commandId parameter must match the command field in package.json
-    let disposable = vscode.commands.registerCommand('extension.sayHello', () => {
-        // The code you place here will be executed every time your command is executed
+    let apmTracker = new ApmTracker();
+    let controller = new ApmCounterController(apmTracker);
 
-        // Display a message box to the user
-        vscode.window.showInformationMessage('Hello World!');
+    let disposable = commands.registerCommand('extension.trackApm', () => {
+
+        window.showInformationMessage('Tracking APM!');
     });
 
+    context.subscriptions.push(controller);
+    context.subscriptions.push(apmTracker);
     context.subscriptions.push(disposable);
 }
 
-// this method is called when your extension is deactivated
 export function deactivate() {
+}
+
+class ApmTracker{
+    private _statusBarItem: StatusBarItem = window.createStatusBarItem(StatusBarAlignment.Left);
+
+    public updateAPM(calculatedApm: number){
+        let editor = window.activeTextEditor;
+        if(!editor){
+            this._statusBarItem.hide();
+            return;
+        }
+        console.log("Updating APM!");
+        
+        let displayedApm = calculatedApm;
+
+        this._statusBarItem.text = `${displayedApm} APM`;
+        this._statusBarItem.show(); 
+    }
+
+    dispose(){
+        this._statusBarItem.dispose();
+    }
+}
+
+class ApmCounterController{
+    private _apmTracker: ApmTracker;
+    private _disposable: Disposable;
+    public _apmCount: number;
+    public _calculatedApm: number;
+
+    constructor(apmTracker: ApmTracker){
+        this._apmTracker = apmTracker;
+        this._apmCount = 0;
+        this._calculatedApm = 0;
+
+        let subscriptions: Disposable[] = [];
+        window.onDidChangeTextEditorSelection(this._onEvent, this, subscriptions);
+        window.onDidChangeActiveTextEditor(this._onEvent, this, subscriptions);
+
+        setInterval(() => {
+            console.log("APM Calculating");
+            if(this._apmCount === 0){
+                this._calculatedApm = 0;
+            }else{
+                this._calculatedApm = this._apmCount * 60;
+                this._calculatedApm = Math.floor(this._calculatedApm);
+            }
+            this._apmCount = 0;
+            this._apmTracker.updateAPM(this._calculatedApm);
+        }, 1000);
+
+        this._disposable = Disposable.from(...subscriptions);
+
+    }
+
+    private _onEvent(){
+        this._apmCount += 1;
+    }
+
+    dispose(){
+        this._disposable.dispose();
+    }
 }
