@@ -3,9 +3,10 @@
 
 ## Features
 
-
+1. Tracks your APM while you code!
+ 
 ## Requirements
-
+None!
 
 ## Extension Settings
 
